@@ -53,7 +53,7 @@ impl<'a> TestCase<'a> {
 
     pub fn program_path<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
         let text = std::fs::read_to_string(path).expect("path should be readable");
-        let compiled = simplicityhl::CompiledProgram::new(text.as_str(), simplicityhl::Arguments::default(), false)
+        let compiled = simplicityhl::CompiledProgram::new(text.as_str(), simplicityhl::Arguments::default(), false, Box::new(simplicityhl::ast::ElementsJetHinter::new()))
             .expect("program should compile");
         self.compiled = Some(compiled);
         self
@@ -62,7 +62,7 @@ impl<'a> TestCase<'a> {
     pub fn template_path<P: AsRef<std::path::Path>>(mut self, path: P) -> Self {
         let text = std::fs::read_to_string(path).expect("path should be readable");
         let template =
-            simplicityhl::TemplateProgram::new(text.as_str()).expect("program should compile");
+            simplicityhl::TemplateProgram::new(text.as_str(), Box::new(simplicityhl::ast::ElementsJetHinter::new())).expect("program should compile");
         self.template = Some(template);
         self
     }
@@ -205,7 +205,7 @@ impl<'a> TestCase<'a> {
         let satisfied_program = compiled
             .satisfy(witness_values)
             .expect("program should be satisfiable");
-        let (program_bytes, witness_bytes) = satisfied_program.redeem().encode_to_vec();
+        let (program_bytes, witness_bytes) = satisfied_program.redeem().to_vec_with_witness();
         psbt.inputs_mut()[0].final_script_witness = Some(vec![
             witness_bytes,
             program_bytes,
@@ -216,6 +216,7 @@ impl<'a> TestCase<'a> {
             .extract_tx()
             .expect("transaction should be extractable");
 
+        assert!(self.daemon.test_mempool_accept(&tx));
         let _txid = self.daemon.send_raw_transaction(&tx);
     }
 }

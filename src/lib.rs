@@ -58,6 +58,16 @@ pub struct TemplateProgram {
     jet_hinter: Box<dyn ast::JetHinter>,
 }
 
+impl Clone for TemplateProgram {
+    fn clone(&self) -> Self {
+        Self {
+            simfony: self.simfony.clone(),
+            file: Arc::clone(&self.file),
+            jet_hinter: self.jet_hinter.clone_box(),
+        }
+    }
+}
+
 impl TemplateProgram {
     /// Parse the template of a SimplicityHL program.
     ///
