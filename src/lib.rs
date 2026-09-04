@@ -460,6 +460,37 @@ impl SatisfiedProgram {
         &self.simplicity
     }
 
+    /// Return the length, in bytes, of the padding witness stack item required
+    /// so the cost of the satisfied, pruned program fits within the interpreter's
+    /// `(minCost, budget]` acceptance window.
+    ///
+    /// The cost is taken from the *satisfied* (and, if an env was passed to
+    /// [`CompiledProgram::satisfy_with_env`], pruned) program, so it reflects
+    /// exactly which branch of a witness-selected case runs and which subtrees
+    /// were pruned — not the full template. The witness stack is passed as
+    /// `&[Vec<u8>]` (the padding item *not* yet included); `None` means the cost
+    /// already fits the budget and no padding is required.
+    pub fn required_padding_size(&self, witness_stack: &[Vec<u8>]) -> Option<usize> {
+        self.redeem().bounds().cost.get_padding_size(witness_stack)
+    }
+
+    /// Return the padding witness stack item required so the cost of the
+    /// satisfied, pruned program fits within the interpreter's
+    /// `(minCost, budget]` acceptance window. See [`Self::required_padding_size`].
+    ///
+    /// Bitcoin's padding is a plain all-zero witness stack item. This is
+    /// built directly rather than delegating to
+    /// [`Cost::get_padding_bytes`], because that method is feature-gated and
+    /// returns the Elements **annex** (`[0x50]` + zeros) when the `elements`
+    /// feature is active — which a Bitcoin spend must not include (a leading
+    /// `0x50` on a regular stack item is misread as an annex). The length is
+    /// chain-agnostic, so delegating only to the size, then filling with zeros,
+    /// is correct under any feature set.
+    pub fn required_padding_bytes(&self, witness_stack: &[Vec<u8>]) -> Option<Vec<u8>> {
+        self.required_padding_size(witness_stack)
+            .map(|len| vec![0x00; len])
+    }
+
     /// Access the debug symbols for the Simplicity target code.
     pub fn debug_symbols(&self) -> &DebugSymbols {
         &self.debug_symbols
@@ -1670,6 +1701,70 @@ fn main() {
         TestCase::program_text_with_unstable(Cow::Borrowed(src), UnstableFeatures::all())
             .with_witness_values(witness)
             .assert_run_success();
+    }
+
+    #[test]
+    fn satisfied_program_padding_reports_exact_padding() {
+        // hash_loop runs a full 0x00..0xff SHA-256 pass, so its satisfied cost
+        // exceeds the budget of the natural witness stack and needs padding.
+        // Construct the satisfied, pruned program exactly as the harness does,
+        // then assert the padding API surfaces the required item.
+        let satisfied = TestCase::<CompiledProgram>::program_file("examples/hash_loop.simf")
+            .with_witness_values(WitnessValues::default());
+
+        let cost = satisfied.program.redeem().bounds().cost;
+        let empty_stack: Vec<Vec<u8>> = vec![];
+
+        let size = satisfied
+            .program
+            .required_padding_size(&empty_stack)
+            .expect("a 0x00..0xff sha256 loop should need padding");
+        let bytes: Vec<u8> = satisfied
+            .program
+            .required_padding_bytes(&empty_stack)
+            .expect("padding bytes should be available");
+
+        // Both methods agree, and the bytes are a plain all-zero Bitcoin item
+        // of exactly the reported length (no 0x50 annex tag on Bitcoin).
+        assert_eq!(bytes.len(), size);
+        assert!(bytes.iter().all(|&b| b == 0x00));
+
+        // The reported padding is exact: it must land the cost inside the
+        // (minCost, budget] window. One byte shorter must still be over budget
+        // (is_budget_valid false), and the full item must make it valid.
+        let under = {
+            let mut s = empty_stack.clone();
+            if size > 1 {
+                s.push(vec![0x00; size - 1]);
+                s
+            } else {
+                empty_stack.clone()
+            }
+        };
+        let exact = {
+            let mut s = empty_stack.clone();
+            s.push(vec![0x00; size]);
+            s
+        };
+
+        // Sanity on the relationship via the underlying API: cost over the
+        // pre-padding stack, valid after the exact item is appended.
+        assert!(!cost.is_budget_valid(&empty_stack), "loop should exceed budget without padding");
+        assert!(cost.is_budget_valid(&exact), "exact padding must satisfy the budget");
+        if size > 1 {
+            assert!(!cost.is_budget_valid(&under), "under-padding must remain over budget");
+        }
+    }
+
+    #[test]
+    fn satisfied_program_padding_none_when_within_budget() {
+        // A trivial program (unit) has negligible cost; its natural witness
+        // stack already provides enough budget, so no padding is required.
+        let satisfied = TestCase::<CompiledProgram>::program_text(Cow::Borrowed("fn main() {}"))
+            .with_witness_values(WitnessValues::default());
+        let empty_stack: Vec<Vec<u8>> = vec![];
+        assert_eq!(satisfied.program.required_padding_size(&empty_stack), None);
+        assert_eq!(satisfied.program.required_padding_bytes(&empty_stack), None);
     }
 
     #[test]
