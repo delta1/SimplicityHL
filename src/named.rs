@@ -231,7 +231,11 @@ pub fn populate_witnesses(
         fn convert_data(
             &mut self,
             data: &PostOrderIterItem<&CommitNode>,
-            inner: Inner<&Arc<node::RedeemNode>, &Arc<node::RedeemNode>, &simplicity::Value>,
+            inner: Inner<
+                &Arc<node::RedeemNode>,
+                &Arc<node::RedeemNode>,
+                &simplicity::Value,
+            >,
         ) -> Result<Arc<node::RedeemData>, Self::Error> {
             let inner = inner
                 .map(|node| node.cached_data())

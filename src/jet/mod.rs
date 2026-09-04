@@ -1,3 +1,4 @@
+pub mod bitcoin;
 pub mod core;
 #[cfg(feature = "external-jets")]
 mod dynlib;
@@ -160,7 +161,7 @@ pub fn target_type(jet: &dyn JetHL) -> AliasedType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use simplicity::jet::{Elements, Jet};
+    use simplicity::jet::{Bitcoin, Elements, Jet};
 
     #[test]
     fn compatible_source_type() {
@@ -181,6 +182,35 @@ mod tests {
     #[test]
     fn compatible_target_type() {
         for jet in Elements::ALL {
+            let resolved_ty = target_type(&jet).resolve_builtin().unwrap();
+            let structural_ty = StructuralType::from(&resolved_ty);
+            let simplicity_ty = jet.target_ty().to_final();
+
+            println!("{jet}");
+            assert_eq!(structural_ty.as_ref(), simplicity_ty.as_ref());
+        }
+    }
+
+    #[test]
+    fn compatible_source_type_bitcoin() {
+        for jet in Bitcoin::ALL {
+            println!("{jet}");
+            let resolved_ty = ResolvedType::tuple(
+                source_type(&jet)
+                    .into_iter()
+                    .map(|t| t.resolve_builtin().unwrap()),
+            );
+            let structural_ty = StructuralType::from(&resolved_ty);
+            let simplicity_ty = jet.source_ty().to_final();
+
+            println!("{jet}");
+            assert_eq!(structural_ty.as_ref(), simplicity_ty.as_ref());
+        }
+    }
+
+    #[test]
+    fn compatible_target_type_bitcoin() {
+        for jet in Bitcoin::ALL {
             let resolved_ty = target_type(&jet).resolve_builtin().unwrap();
             let structural_ty = StructuralType::from(&resolved_ty);
             let simplicity_ty = jet.target_ty().to_final();

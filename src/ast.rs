@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use either::Either;
 use miniscript::iter::{Tree, TreeLike};
-use simplicity::jet::{Core, Elements, Jet};
+use simplicity::jet::{Bitcoin, Core, Elements, Jet};
 
 use crate::debug::{CallTracker, DebugSymbols, TrackedCallName};
 use crate::driver::{CRATE_STR, MAIN_STR};
@@ -697,6 +697,7 @@ macro_rules! impl_jet_hinter {
 }
 
 impl_jet_hinter!(ElementsJetHinter, Elements);
+impl_jet_hinter!(BitcoinJetHinter, Bitcoin);
 impl_jet_hinter!(CoreJetHinter, Core);
 
 /// A single module namespace. Handles arbitrary nesting via `submodules`.

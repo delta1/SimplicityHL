@@ -435,7 +435,8 @@ impl Call {
                 args.comp(&body).with_span(self)
             }
             CallName::Assert => {
-                let jet = ProgNode::jet(scope.ctx(), scope.jet_hinter.construct_verify().as_jet());
+                let verify = scope.jet_hinter.construct_verify();
+                let jet = ProgNode::jet(scope.ctx(), verify.as_jet());
                 scope.with_debug_symbol(args, &jet, self)
             }
             CallName::Panic => {

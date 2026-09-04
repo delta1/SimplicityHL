@@ -2,7 +2,7 @@ use base64::display::Base64Display;
 use base64::engine::general_purpose::STANDARD;
 use clap::{Arg, ArgAction, Command};
 
-use simplicityhl::ast::ElementsJetHinter;
+use simplicityhl::ast::BitcoinJetHinter;
 use simplicityhl::error::should_color;
 use simplicityhl::version::SimcDirective;
 use simplicityhl::{
@@ -201,7 +201,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         source,
         &dependencies,
         &unstable_features,
-        Box::new(ElementsJetHinter::new()),
+        Box::new(BitcoinJetHinter::new()),
     ) {
         Ok(program) => program,
         Err(diags) => {
